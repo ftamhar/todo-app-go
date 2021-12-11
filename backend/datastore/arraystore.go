@@ -76,11 +76,15 @@ func (as *ArrayStore) UpdateTodo(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			as.data[i].Status = parseBool
-			res.ID = as.data[i].ID
-			res.Title = as.data[i].Title
-			res.Status = as.data[i].Status
+			res = as.data[i]
 			break
 		}
+	}
+
+	if res.ID == 0 {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("data not found"))
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -89,17 +93,26 @@ func (as *ArrayStore) UpdateTodo(w http.ResponseWriter, r *http.Request) {
 
 func (as *ArrayStore) DeleteTodo(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	newData := make([]model.TodoData, 0)
-
-	idx, _ := strconv.Atoi(id)
-	for i := range as.data {
-		if as.data[i].ID != idx {
-			newData = append(newData, as.data[i])
-		}
-	}
-	as.data = newData
 
 	w.Header().Set("Content-Type", "application/json")
+	idx, err := strconv.Atoi(id)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "failed",
+			"message": "id is not numeric",
+		})
+		return
+	}
+
+	delId := -1
+	for i := range as.data {
+		if as.data[i].ID == idx {
+			delId = i
+			break
+		}
+	}
+
+	as.data = append(as.data[:delId], as.data[delId+1:]...)
 	json.NewEncoder(w).Encode(map[string]string{
 		"status": "success",
 	})
