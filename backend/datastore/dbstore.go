@@ -68,7 +68,7 @@ func (ds *DBStore) GetCompleted(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ds *DBStore) GetIncomplete(w http.ResponseWriter, r *http.Request) {
-	var completed []model.TodoData
+	var incompleted []model.TodoData
 
 	query := `
 		SELECT id, title, status
@@ -90,11 +90,11 @@ func (ds *DBStore) GetIncomplete(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 
-		completed = append(completed, data)
+		incompleted = append(incompleted, data)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(completed)
+	json.NewEncoder(w).Encode(incompleted)
 }
 
 func (ds *DBStore) CreateTodo(w http.ResponseWriter, r *http.Request) {
@@ -117,13 +117,24 @@ func (ds *DBStore) UpdateTodo(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	value := r.FormValue("status")
 
+	w.Header().Set("Content-Type", "application/json")
 	status, err := strconv.ParseBool(value)
 	if err != nil {
-		panic(err)
+		w.WriteHeader(http.StatusNotAcceptable)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "failed",
+			"message": "status must be boolean",
+		})
+		return
 	}
 	idx, err := strconv.Atoi(id)
 	if err != nil {
-		panic(err)
+		w.WriteHeader(http.StatusNotAcceptable)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "failed",
+			"message": "id must be numeric",
+		})
+		return
 	}
 	q := `
 		UPDATE todo SET status = $1 WHERE id = $2 RETURNING id, title, status
@@ -131,18 +142,27 @@ func (ds *DBStore) UpdateTodo(w http.ResponseWriter, r *http.Request) {
 	var res model.TodoData
 	err = ds.db.QueryRow(q, status, idx).Scan(&res.ID, &res.Title, &res.Status)
 	if err != nil {
-		panic(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "failed",
+			"message": err.Error(),
+		})
+		return
 	}
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(res)
 }
 
 func (ds *DBStore) DeleteTodo(w http.ResponseWriter, r *http.Request) {
-
+	w.Header().Set("Content-Type", "application/json")
 	id := mux.Vars(r)["id"]
 	idx, err := strconv.Atoi(id)
 	if err != nil {
-		panic(err)
+		w.WriteHeader(http.StatusNotAcceptable)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "failed",
+			"message": "id must be numeric",
+		})
+		return
 	}
 
 	q := `
@@ -150,10 +170,14 @@ func (ds *DBStore) DeleteTodo(w http.ResponseWriter, r *http.Request) {
 `
 	_, err = ds.db.Exec(q, idx)
 	if err != nil {
-		panic(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "failed",
+			"message": err.Error(),
+		})
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"status": "success",
 	})
