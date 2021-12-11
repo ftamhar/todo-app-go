@@ -100,10 +100,19 @@ func (ds *DBStore) GetIncomplete(w http.ResponseWriter, r *http.Request) {
 func (ds *DBStore) CreateTodo(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("title")
 	query := `
-		INSERT INTO todo(title) values ($1) RETURNING id
+		INSERT INTO todo(title) VALUES ($1) RETURNING id
 `
 	id := 0
-	ds.db.QueryRow(query, title).Scan(&id)
+	err := ds.db.QueryRow(query, title).Scan(&id)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "failed",
+			"message": err.Error(),
+		})
+		return
+	}
+
 	res := model.TodoData{
 		ID:     id,
 		Title:  title,
