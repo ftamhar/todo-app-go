@@ -51,7 +51,7 @@ func (as *ArrayStore) CreateTodo(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("title")
 
 	newTodo := model.TodoData{
-		ID:     len(as.data)+1,
+		ID:     len(as.data) + 1,
 		Title:  title,
 		Status: false,
 	}
@@ -66,6 +66,7 @@ func (as *ArrayStore) UpdateTodo(w http.ResponseWriter, r *http.Request) {
 	status := r.FormValue("status")
 	idx, _ := strconv.Atoi(id)
 
+	var res model.TodoData
 	for i := range as.data {
 		if as.data[i].ID == idx {
 			parseBool, err := strconv.ParseBool(status)
@@ -75,10 +76,15 @@ func (as *ArrayStore) UpdateTodo(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			as.data[i].Status = parseBool
+			res.ID = as.data[i].ID
+			res.Title = as.data[i].Title
+			res.Status = as.data[i].Status
 			break
 		}
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(res)
 }
 
 func (as *ArrayStore) DeleteTodo(w http.ResponseWriter, r *http.Request) {
@@ -92,4 +98,9 @@ func (as *ArrayStore) DeleteTodo(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	as.data = newData
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status": "success",
+	})
 }
