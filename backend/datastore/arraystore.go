@@ -53,7 +53,6 @@ func (as *ArrayStore) CreateTodo(w http.ResponseWriter, r *http.Request) {
 	newTodo := model.TodoData{
 		ID:     len(as.data) + 1,
 		Title:  title,
-		Status: false,
 	}
 	as.data = append(as.data, newTodo)
 
@@ -64,7 +63,17 @@ func (as *ArrayStore) CreateTodo(w http.ResponseWriter, r *http.Request) {
 func (as *ArrayStore) UpdateTodo(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	status := r.FormValue("status")
-	idx, _ := strconv.Atoi(id)
+
+	w.Header().Set("Content-Type", "application/json")
+	idx, err := strconv.Atoi(id)
+	if err != nil {
+		w.WriteHeader(http.StatusNotAcceptable)
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "failed",
+			"message": "id is not numeric",
+		})
+		return
+	}
 
 	var res model.TodoData
 	for i := range as.data {
@@ -72,7 +81,10 @@ func (as *ArrayStore) UpdateTodo(w http.ResponseWriter, r *http.Request) {
 			parseBool, err := strconv.ParseBool(status)
 			if err != nil {
 				w.WriteHeader(http.StatusNotAcceptable)
-				w.Write([]byte("failed to parse bool"))
+				json.NewEncoder(w).Encode(map[string]string{
+					"status":  "failed",
+					"message": "status must be boolean",
+				})
 				return
 			}
 			as.data[i].Status = parseBool
@@ -83,11 +95,13 @@ func (as *ArrayStore) UpdateTodo(w http.ResponseWriter, r *http.Request) {
 
 	if res.ID == 0 {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("data not found"))
+		json.NewEncoder(w).Encode(map[string]string{
+			"status":  "failed",
+			"message": "data not found",
+		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(res)
 }
 
@@ -110,6 +124,12 @@ func (as *ArrayStore) DeleteTodo(w http.ResponseWriter, r *http.Request) {
 			delId = i
 			break
 		}
+	}
+
+	if delId == -1 {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("data not found"))
+		return
 	}
 
 	as.data = append(as.data[:delId], as.data[delId+1:]...)
